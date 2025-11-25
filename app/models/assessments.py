@@ -1,5 +1,5 @@
 
-from beanie import Document, Indexed
+from beanie import Document, Indexed, Link
 from typing import Optional, List, Any
 
 class Assessment(Document):

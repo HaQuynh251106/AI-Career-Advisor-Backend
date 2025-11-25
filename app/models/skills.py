@@ -1,5 +1,5 @@
 
-from beanie import Document, Link
+from beanie import Document, Indexed
 from typing import Optional
 
 class Skill(Document):

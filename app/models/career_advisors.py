@@ -1,5 +1,5 @@
 
-from beanie import Document, Link
+from beanie import Document, Indexed, Link
 from pydantic import Field
 from typing import Optional, List
 from app.models.user import User
@@ -13,3 +13,4 @@ class CareerAdvisor(Document):
 
     class Settings:
         name = "career_advisors"
+        

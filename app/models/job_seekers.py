@@ -1,5 +1,5 @@
 
-from beanie import Document, Link
+from beanie import Document, Indexed, Link
 from pydantic import Field, HttpUrl
 from typing import Optional, List
 from app.models.user import User

@@ -1,5 +1,5 @@
 
-from beanie import Document, Indexed
+from beanie import Document, Indexed, Link
 from pydantic import Field, EmailStr
 from typing import Optional
 

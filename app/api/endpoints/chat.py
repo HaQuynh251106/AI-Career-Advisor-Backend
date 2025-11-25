@@ -1,85 +1,91 @@
-
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.schemas.chat import ChatMessageRequest, ChatMessageResponse, ChatMessage
-from app.services.ai_advisor import ai_advisor_service
-from app.core.security import get_current_active_user
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+import google.generativeai as genai
+from app.api import deps 
 from app.models.user import User
 from app.models.ai_recommendations import AIRecommendation
-from beanie.operators import In
-from typing import List
 
 router = APIRouter()
 
-@router.post("/advice", response_model=ChatMessageResponse)
-async def get_ai_advice(
-    chat_request: ChatMessageRequest,
-    current_user: User = Depends(get_current_active_user)
+# --- CẤU HÌNH API KEY ---
+MY_API_KEY = "AIzaSyCHoPkD3RU1XVdpsMcjf40ngiuzAfPfEt8" 
+
+try:
+    genai.configure(api_key=MY_API_KEY)
+    print(f"✅ Đã nạp API Key thành công.")
+except Exception as e:
+    print(f"❌ Lỗi nạp Key: {e}")
+
+# --- SỬA Ở ĐÂY: Đổi sang gemini-1.5-pro ---
+model = genai.GenerativeModel('gemini-2.5-flash')
+# ------------------------------------------
+
+class ChatRequest(BaseModel):
+    message: str
+
+class ChatResponse(BaseModel):
+    response: str
+
+@router.post("/advice", response_model=ChatResponse)
+async def get_advice(
+    chat_request: ChatRequest,
+    current_user: User = Depends(deps.get_current_user)
 ):
-    """
-    Endpoint nhận tin nhắn từ người dùng và trả về phản hồi từ AI Career Advisor.
-    """
-    
-    # 1. Gọi AI Service để nhận câu trả lời
-    ai_response_text, updated_history_dict = await ai_advisor_service.get_advice(
-        history=[msg.model_dump() for msg in chat_request.history], # Chuyển schema sang dict
-        new_message=chat_request.message
-    )
-    
-    # 2. Lưu lịch sử chat (tin nhắn user và tin nhắn AI) vào CSDL
     try:
-        # Lấy tin nhắn người dùng cuối cùng
-        user_prompt = chat_request.message
-        
-        # Lưu prompt
-        user_prompt_record = AIRecommendation(
-            user_id=current_user,
-            type="chat_prompt",
-            prompt=user_prompt
-        )
-        await user_prompt_record.insert()
-        
-        # Lưu response
-        ai_response_record = AIRecommendation(
-            user_id=current_user,
-            type="chat_response",
-            response=ai_response_text
-        )
-        await ai_response_record.insert()
-        
+        # 1. Gọi AI
+        prompt = f"User: {chat_request.message}"
+        ai_response = model.generate_content(prompt)
+        ai_text = ai_response.text
+
+        # 2. Lưu DB
+        try:
+            await AIRecommendation(
+                user_id=str(current_user.id),
+                type="chat_prompt",
+                prompt=chat_request.message
+            ).insert()
+            
+            await AIRecommendation(
+                user_id=str(current_user.id),
+                type="chat_response",
+                response=ai_text
+            ).insert()
+        except Exception as db_e:
+            print(f"⚠️ Lỗi lưu DB: {db_e}")
+
+        return {"response": ai_text}
+
     except Exception as e:
-        # Log lỗi nếu không lưu được vào DB, nhưng vẫn trả về kết quả AI
-        print(f"Error saving chat history to DB: {e}")
+        print(f"❌ Lỗi Gemini: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Lỗi AI: {str(e)}")
 
-    # Chuyển đổi lại updated_history (list of dict) sang list of ChatMessage schema
-    history_schema = [ChatMessage(**msg) for msg in updated_history_dict]
-
-    return ChatMessageResponse(
-        user_id=str(current_user.id),
-        response=ai_response_text,
-        history=history_schema
-    )
-
-@router.get("/history", response_model=List[ChatMessage])
+@router.get("/history")
 async def get_chat_history(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(deps.get_current_user)
 ):
-    """
-    Tải lịch sử chat của người dùng (chỉ tải prompt và response).
-    """
     history_records = await AIRecommendation.find(
-        AIRecommendation.user_id.id == current_user.id, # Lọc theo user_id
-        In(AIRecommendation.type, ["chat_prompt", "chat_response"]) # Chỉ lấy 2 loại
-    ).sort("timestamp").to_list() # Sắp xếp theo thời gian
+        {"user_id": str(current_user.id)}
+    ).sort("+timestamp").to_list()
 
-    history_chat_format = []
+    formatted_history = []
     for record in history_records:
         if record.type == "chat_prompt" and record.prompt:
-            history_chat_format.append(
-                ChatMessage(role="user", parts=[{"text": record.prompt}])
-            )
+            formatted_history.append({"role": "user", "content": record.prompt})
         elif record.type == "chat_response" and record.response:
-             history_chat_format.append(
-                ChatMessage(role="model", parts=[{"text": record.response}])
-            )
+            formatted_history.append({"role": "ai", "content": record.response})
             
-    return history_chat_format
+    return formatted_history
+
+# # --- DÁN VÀO CUỐI CÙNG FILE chat.py ---
+# print("\n================ KIỂM TRA MODEL GEMINI ================")
+# try:
+#     print("Đang hỏi Google xem có những model nào...")
+#     for m in genai.list_models():
+#         # Chỉ in ra các model hỗ trợ chat (generateContent)
+#         if 'generateContent' in m.supported_generation_methods:
+#             print(f"👉 FOUND MODEL: {m.name}")
+# except Exception as e:
+#     print(f"❌ Lỗi khi lấy danh sách: {e}")
+# print("=======================================================\n")
