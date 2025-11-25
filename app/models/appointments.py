@@ -1,4 +1,5 @@
 
+from typing import Optional
 from beanie import Document, Link, Indexed
 from pydantic import Field
 from datetime import datetime

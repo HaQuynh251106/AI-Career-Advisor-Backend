@@ -1,22 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Query
 from typing import List, Optional
-from app.api import deps 
-from app.models.job_listings import JobListing # Import model của bạn
-from app.models.user import User
-from pydantic import BaseModel
-
+from app.models.job_listings import JobListing
 
 router = APIRouter()
-
-# Schema dữ liệu tạo việc làm (DTO)
-class JobCreate(BaseModel):
-    title: str
-    description: str
-    company: str
-    location: str
-    salary: str
-    job_category_id: str
-    required_skills: List[str] = []
 
 @router.get("/", response_model=List[JobListing])
 async def search_jobs(
@@ -25,37 +11,35 @@ async def search_jobs(
     location: Optional[str] = None,
     limit: int = 20
 ):
-    """API Tìm kiếm việc làm công khai (Public)"""
+    """
+    Tìm kiếm việc làm khớp với cấu trúc Database thực tế
+    """
     search_criteria = {}
     
+    # 1. Xử lý bộ lọc NGÀNH NGHỀ
     if category and category != "all":
-        search_criteria["job_category_id"] = category
-    if location:
-        search_criteria["location"] = location
+        # Frontend gửi 'it', DB lưu 'IT' -> Cần .upper()
+        # DB dùng field 'category_code'
+        search_criteria["category_code"] = category.upper()
 
+    # 2. Xử lý bộ lọc ĐỊA ĐIỂM
+    if location:
+        # Tìm gần đúng địa điểm (regex)
+        search_criteria["location"] = {"$regex": location, "$options": "i"}
+
+    # 3. Tạo Query
     query = JobListing.find(search_criteria)
     
+    # 4. Xử lý tìm kiếm TỪ KHÓA (Title hoặc Company)
     if q:
-        # Tìm kiếm regex không phân biệt hoa thường
-        query = query.find({"title": {"$regex": q, "$options": "i"}})
+        query = query.find({"$or": [
+            {"title": {"$regex": q, "$options": "i"}},
+            {"company": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}}
+        ]})
         
-    return await query.limit(limit).to_list()
+    # Chỉ lấy các job đang active
+    query = query.find({"is_active": True})
 
-@router.get("/{job_id}", response_model=JobListing)
-async def get_job_detail(job_id: str):
-    """Xem chi tiết một công việc"""
-    job = await JobListing.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Không tìm thấy công việc")
-    return job
-
-@router.post("/", response_model=JobListing)
-async def create_job(
-    job_data: JobCreate,
-    current_user: User = Depends(deps.get_current_user)
-):
-    """Đăng việc làm mới (Cần quyền Admin/Recruiter)"""
-    # Logic kiểm tra quyền admin ở đây nếu cần
-    new_job = JobListing(**job_data.dict(), posted_by=current_user.id)
-    await new_job.insert()
-    return new_job
+    results = await query.limit(limit).to_list()
+    return results

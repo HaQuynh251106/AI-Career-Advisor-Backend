@@ -1,15 +1,20 @@
-
-from beanie import Document, Link, Indexed
+from beanie import Document, Indexed
 from pydantic import Field
 from datetime import datetime
-from app.models.job_listings import JobListing
-from app.models.job_seekers import JobSeeker
+from typing import Optional
 
 class Application(Document):
-    job_listing_id: Link[JobListing]
-    job_seeker_id: Link[JobSeeker]
-    status: Indexed(str) = Field(default="applied") # applied, reviewed, rejected, accepted
+    # --- BỔ SUNG CÁC TRƯỜNG CÒN THIẾU ---
+    user_id: Indexed(str)
+    job_id: Indexed(str)
+    # ------------------------------------
+    
+    cover_letter: Optional[str] = None
+    status: str = "Đang chờ duyệt" # pending, reviewed, accepted, rejected
     applied_at: datetime = Field(default_factory=datetime.now)
+    
+    # Các thông tin phụ (nếu cần)
+    resume_link: Optional[str] = None
 
     class Settings:
         name = "applications"

@@ -7,8 +7,7 @@ from beanie import init_beanie
 from app.api.api import api_router
 from app.core.config import settings
 
-# --- IMPORT TẤT CẢ CÁC MODEL CỦA BẠN VÀO ĐÂY ---
-# Nếu thiếu model nào, Beanie sẽ báo lỗi "CollectionWasNotInitialized"
+# --- IMPORT CÁC MODEL BEANIE (DATABASE) ---
 from app.models.user import User
 from app.models.ai_recommendations import AIRecommendation
 from app.models.job_listings import JobListing
@@ -16,45 +15,47 @@ from app.models.job_seekers import JobSeeker
 from app.models.applications import Application
 from app.models.skills import Skill
 from app.models.job_categories import JobCategory
-# -----------------------------------------------
+from app.models.learning_resources import LearningResource
+from app.models.assessments import Assessment
+from app.models.test_results import TestResult
+from app.models.advisors import Advisor
+# (Lưu ý: Không import advisors ở đây vì advisors là API endpoint, không phải Model Database)
 
-# Hàm khởi động và tắt Database (Lifespan)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Khởi động: Kết nối MongoDB
     print("Starting up... Connecting to MongoDB.")
     client = AsyncIOMotorClient(settings.MONGO_URI)
     
-    # 2. Khởi tạo Beanie với danh sách Models
     await init_beanie(
-        database=client.get_database(), # Tự lấy tên DB từ MONGO_URI
+        database=client.get_database(),
         document_models=[
             User,
-            AIRecommendation, # <-- Cái này quan trọng để sửa lỗi của bạn
+            AIRecommendation,
             JobListing,
             JobSeeker,
             Application,
             Skill,
-            JobCategory
+            JobCategory,
+            LearningResource,
+            Assessment,
+            TestResult,
+            Advisor
         ],
     )
     print("Database initialized successfully with all models.")
     
     yield
     
-    # 3. Tắt: Đóng kết nối (nếu cần)
     print("Shutting down...")
 
-# Khởi tạo ứng dụng FastAPI với lifespan
 app = FastAPI(
     title="AI Career Advisor Backend",
-    description="API cho hệ thống Tư vấn Nghề nghiệp AI sử dụng FastAPI và MongoDB.",
+    description="API cho hệ thống Tư vấn Nghề nghiệp AI.",
     version="1.0.0",
     openapi_url="/api/v1/openapi.json",
-    lifespan=lifespan # Gắn hàm lifespan vào đây
+    lifespan=lifespan
 )
 
-# Cấu hình CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -68,9 +69,9 @@ app.add_middleware(
     allow_headers=["*"],
 ) 
 
-# Thêm router chính
+# --- QUAN TRỌNG: Dòng này gom tất cả API từ file api.py ---
 app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/", tags=["Root"])
 def read_root():
-    return {"message": "AI Career Advisor API is running! Truy cập /docs để xem tài liệu."}
+    return {"message": "AI Career Advisor API is running!"}
