@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
     
     # Cấu hình AI (Gemini)
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "AIzaSyCHoPkD3RU1XVdpsMcjf40ngiuzAfPfEt8")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "AIzaSyDHs_J1sQ34UAoQRCVrSQut88AZkYvMspQ")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     
     class Config:
         case_sensitive = True
