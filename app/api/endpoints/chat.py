@@ -10,18 +10,22 @@ from app.models.user import User
 from app.models.ai_recommendations import AIRecommendation
 from app.models.job_listings import JobListing
 from app.models.job_seekers import JobSeeker
+from app.core.config import settings
 
 router = APIRouter()
 
-# --- CẤU HÌNH API KEY ---
-MY_API_KEY = "AIzaSyDHs_J1sQ34UAoQRCVrSQut88AZkYvMspQ" 
+# --- CẤU HÌNH API KEY TỪ FILE .ENV (BẢO MẬT) ---
+if settings.GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        # Chỉ in 5 ký tự đầu để kiểm tra, không in hết key
+        print(f"✅ Đã nạp API Key: {settings.GEMINI_API_KEY[:5]}...")
+    except Exception as e:
+        print(f"❌ Lỗi nạp Key: {e}")
+else:
+    print("❌ CẢNH BÁO: Chưa tìm thấy GEMINI_API_KEY trong file .env")
 
-try:
-    genai.configure(api_key=MY_API_KEY)
-except Exception as e:
-    print(f"Lỗi Key: {e}")
-
-model = genai.GenerativeModel('gemini-2.5-flash')
+model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
 class ChatRequest(BaseModel):
     message: str

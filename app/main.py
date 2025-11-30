@@ -18,7 +18,6 @@ from app.models.job_categories import JobCategory
 from app.models.learning_resources import LearningResource
 from app.models.assessments import Assessment
 from app.models.test_results import TestResult
-from app.models.advisors import Advisor
 # (Lưu ý: Không import advisors ở đây vì advisors là API endpoint, không phải Model Database)
 
 @asynccontextmanager
@@ -38,8 +37,7 @@ async def lifespan(app: FastAPI):
             JobCategory,
             LearningResource,
             Assessment,
-            TestResult,
-            Advisor
+            TestResult           
         ],
     )
     print("Database initialized successfully with all models.")
